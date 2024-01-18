@@ -51,7 +51,7 @@ where
         info_span!("commit to trace data").in_scope(|| pcs.commit_batch(trace));
 
     challenger.observe(trace_commit.clone());
-    let alpha: SC::Challenge = challenger.sample_ext_element::<SC::Challenge>();
+    let alpha: SC::Challenge = challenger.sample_ext_element();
 
     let mut trace_ldes = pcs.get_ldes(&trace_data);
     assert_eq!(trace_ldes.len(), 1);
@@ -68,14 +68,11 @@ where
         trace_lde_for_quotient,
         alpha,
     );
-
-    let quotient_chunks_flattened = info_span!("decompose quotient polynomial").in_scope(|| {
-        decompose_and_flatten::<SC>(
-            quotient_values,
-            SC::Challenge::from_base(pcs.coset_shift()),
-            log_quotient_degree,
-        )
-    });
+    let quotient_chunks_flattened = decompose_and_flatten(
+        quotient_values,
+        SC::Challenge::from_base(pcs.coset_shift()),
+        log_quotient_degree,
+    );
     let (quotient_commit, quotient_data) =
         info_span!("commit to quotient poly chunks").in_scope(|| {
             pcs.commit_shifted_batch(
@@ -198,7 +195,8 @@ where
             let quotient = folder.accumulator * zerofier_inv;
 
             // "Transpose" D packed base coefficients into WIDTH scalar extension coefficients.
-            (0..SC::PackedVal::WIDTH).map(move |idx_in_packing| {
+            let limit = SC::PackedVal::WIDTH.min(quotient_size);
+            (0..limit).map(move |idx_in_packing| {
                 let quotient_value = (0..<SC::Challenge as AbstractExtensionField<SC::Val>>::D)
                     .map(|coeff_idx| quotient.as_base_slice()[coeff_idx].as_slice()[idx_in_packing])
                     .collect_vec();
